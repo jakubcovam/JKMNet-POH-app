@@ -1,4 +1,5 @@
-# app.py
+# streamlit run app.py
+
 import os
 import re
 import glob
@@ -182,7 +183,7 @@ def plot_timeseries_panel(ax, real: pd.Series, ens: pd.DataFrame, title: str,
     if not ens.empty:
         mean = ens.mean(axis=1).values
         std = ens.std(axis=1).values
-        std2 = 2.0 * std  # <-- THIS is the only real change
+        std2 = 2.0 * std
 
         if show_band:
             ax.fill_between(
