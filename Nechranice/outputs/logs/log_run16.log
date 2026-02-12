@@ -1,0 +1,46 @@
+================ Run 16 Settings ================
+Data file: data/inputs/dataOhre_Nechranice.csv
+ID filter: 1-13-02-1210-1-00-00
+Columns: PREP PREP bal_inflow 
+Architecture: 50 50 10 
+Trainer: batch_epoch
+Activation: LEAKYRELU
+Weight init: RANDOM
+Input numbers: -10,-9,-8,-7,-6,-5,-4,-3,-2,-1, | 0,1,2,3,4,5,6,7,8,9, | -10,-9,-8,-7,-6,-5,-4,-3,-2,-1, | 
+Learning rate: 0.001
+Max iterations: 1000
+Max metrics step: 10
+Max error: 0.002
+Batch size: 30
+Ensemble runs: 20
+Train fraction: 0.8
+Shuffle: true
+Split shuffle: false
+Seed: 0
+Transform: MINMAX
+Transform alpha: 5
+Exclude last col from transform: false
+Remove NA before calib: true
+PSO optimize: false
+Output dir: data/outputs/
+Log dir: data/outputs/logs/
+Real calib data: data/outputs/calib_real.csv
+Predict calib data: data/outputs/calib_pred.csv
+Real valid data: data/outputs/valid_real.csv
+Predict valid data: data/outputs/valid_pred.csv
+Weights init: data/outputs/weights/weights_init.csv
+Weights final: data/outputs/weights/weights_final.csv
+Metrics calib: data/outputs/metrics/calib_metrics.csv
+Metrics valid: data/outputs/metrics/valid_metrics.csv
+===========================================================
+Run 16 starting...
+-> Initial weights saved.
+-> Training starting...
+-> Training finished.
+-> Evaluating calibration set...
+-> Calibration metrics and predictions saved.
+-> Final weights saved.
+-> Evaluating validation set...
+-> Validation metrics and predictions saved.
+Run 16 finished.
+-------------------------------------------
