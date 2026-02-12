@@ -9,7 +9,10 @@ import streamlit as st
 import matplotlib.pyplot as plt
 
 # ================= CONFIG =================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "scenarios"
+)
 
 OUTPUTS_SUBDIR = "outputs"
 METRICS_SUBDIR = os.path.join("outputs", "metrics")
