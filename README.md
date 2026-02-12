@@ -6,6 +6,12 @@ A Streamlit-based interactive dashboard for exploring ANN-based inflow predictio
 
 ---
 
+## Screenshot
+
+![Streamlit screenshot](screenshot/app_version_20260212.png)
+
+---
+
 ## Features
 
 - **Time Series View** - plot observed vs. ensemble-predicted inflows for any forecast horizon, with optional display of individual ensemble members and a ±2 standard deviation uncertainty band
