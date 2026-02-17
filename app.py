@@ -6,7 +6,8 @@ import glob
 import numpy as np
 import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # ================= CONFIG =================
 BASE_DIR = os.path.join(
@@ -76,50 +77,83 @@ def load_metric_long(id_name: str, dataset: str, metric: str) -> pd.DataFrame:
 
     out = pd.DataFrame(rows)
     if not out.empty:
-        # keep natural h-order (h1,h2,...)
         out["hnum"] = out["horizon"].str.extract(r"h(\d+)").astype(float)
         out = out.sort_values(["set", "hnum", "run"]).drop(columns=["hnum"])
     return out
 
-def metrics_boxplots_two_panels(df_all: pd.DataFrame, metric: str, same_y: bool):
-    # horizon order from data (supports h1..h3 etc.)
+def metrics_boxplots_two_panels(df_all: pd.DataFrame, metric: str, same_y: bool) -> go.Figure:
     horizons = sorted(df_all["horizon"].unique(), key=lambda x: int(re.findall(r"\d+", x)[0]))
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 4), sharex=True)
-    for ax, ds in zip(axes, SETS):
+    # Never use shared_yaxes — it merges axes onto one side and drops gridlines
+    # on the other panel. Manual range sync below handles the same_y case instead.
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=["calib", "valid"],
+        shared_yaxes=False,
+    )
+
+    colors = {"calib": "#1f77b4", "valid": "#ff7f0e"}
+
+    for col_idx, ds in enumerate(SETS, start=1):
         df_ds = df_all[df_all["set"] == ds]
-        data = [df_ds.loc[df_ds["horizon"] == h, "value"].dropna().values for h in horizons]
+        for h in horizons:
+            vals = df_ds.loc[df_ds["horizon"] == h, "value"].dropna().values
+            fig.add_trace(
+                go.Box(
+                    y=vals,
+                    name=h,
+                    marker_color=colors[ds],
+                    showlegend=False,
+                    boxpoints="outliers",
+                ),
+                row=1, col=col_idx,
+            )
 
-        ax.boxplot(data, tick_labels=horizons, showfliers=True)
-        ax.set_title(ds)
-        ax.set_xlabel("Horizon")
-        ax.grid(axis="y", alpha=0.3)
+    fig.update_layout(
+        title_text=f"{metric} napříč spuštěními — kalibrace vs validace",
+        title_font=dict(size=25),
+        height=500,
+        template="plotly_white",
+        font=dict(size=20),
+    )
+    fig.update_xaxes(title_text="Horizon", title_font=dict(size=25), tickfont=dict(size=20))
 
-    axes[0].set_ylabel(metric)
-    fig.suptitle(f"{metric} napříč spuštěními - kalibrace vs validace", y=1.05)
+    # Style BOTH y-axes explicitly — col=1 only would leave the valid panel
+    # with the default (smaller) font.
+    for col_idx in (1, 2):
+        fig.update_yaxes(
+            title_text=metric,
+            title_font=dict(size=25),
+            tickfont=dict(size=20),
+            row=1, col=col_idx,
+        )
 
+    # Manual range sync: compute a shared range from all values + a small pad.
+    # Keeps both axes fully independent (gridlines on both) while showing the
+    # same scale when the checkbox is ticked.
     if same_y:
-        ymin = min(ax.get_ylim()[0] for ax in axes)
-        ymax = max(ax.get_ylim()[1] for ax in axes)
-        for ax in axes:
-            ax.set_ylim(ymin, ymax)
+        all_vals = df_all["value"].dropna()
+        spread = all_vals.max() - all_vals.min()
+        pad = spread * 0.05 if spread > 0 else 0.5
+        shared_range = [all_vals.min() - pad, all_vals.max() + pad]
+        for col_idx in (1, 2):
+            fig.update_yaxes(range=shared_range, row=1, col=col_idx)
 
-    fig.tight_layout()
+    # enlarge subplot title annotations
+    for ann in fig.layout.annotations:
+        ann.font = dict(size=20)
+
     return fig
 
 # =========================================
 # TIME SERIES helpers (real + ensemble preds)
 # =========================================
 def find_horizons_from_real(id_name: str, dataset: str):
-    """
-    Reads headers from <dataset>_real.csv and returns horizon columns found (h1..hN).
-    """
     real_path = os.path.join(outputs_dir_for_id(id_name), f"{dataset}_real.csv")
     if not os.path.exists(real_path):
         return []
     df = pd.read_csv(real_path)
     horizons = [c for c in df.columns if str(c).startswith("h")]
-    # sort by number if possible
     try:
         horizons = sorted(horizons, key=lambda x: int(re.findall(r"\d+", x)[0]))
     except Exception:
@@ -151,78 +185,180 @@ def load_pred_ensemble(id_name: str, dataset: str, horizon: str) -> pd.DataFrame
         if not m:
             continue
         run = int(m.group(1))
-
         df = pd.read_csv(p)
         if horizon not in df.columns:
             continue
-
         cols[f"run_{run}"] = df[horizon].astype(float).reset_index(drop=True)
 
     if not cols:
         return pd.DataFrame()
 
     ens = pd.DataFrame(cols)
-    # sort columns by run number
     ens = ens.reindex(sorted(ens.columns, key=lambda c: int(c.split("_")[1])), axis=1)
     return ens
 
-def plot_timeseries_panel(ax, real: pd.Series, ens: pd.DataFrame, title: str,
-                          show_members: bool, show_band: bool):
-    x = np.arange(len(real))
-
-    # ---- ensemble members (very light grey)
-    if show_members and not ens.empty:
-        for c in ens.columns:
-            ax.plot(
-                x,
-                ens[c].values,
-                color="0.8",
-                linewidth=0.8,
-                alpha=0.8,
-                zorder=1
-            )
-
-    # ---- ensemble mean + band
-    if not ens.empty:
-        mean = ens.mean(axis=1).values
-        std = ens.std(axis=1).values
-        std2 = 2.0 * std
-
-        if show_band:
-            ax.fill_between(
-                x,
-                mean - std2,
-                mean + std2,
-                color="tab:orange",
-                alpha=0.5,
-                zorder=2,
-                label="Pred ± 2 std"
-            )
-
-        # mean line (dominant)
-        ax.plot(
-            x,
-            mean,
-            color="tab:orange",
-            linewidth=3.0,
-            linestyle="-",
-            zorder=4,
-            label="Pred mean"
-        )
-
-    # ---- real data (black but slightly thinner than mean)
-    ax.plot(
-        x,
-        real.values,
-        color="black",
-        linewidth=1.0,
-        zorder=5,
-        label="Real"
+def build_timeseries_figure(
+    id_name: str,
+    horizon: str,
+    show_members: bool,
+    show_band: bool,
+) -> go.Figure:
+    """
+    Returns a single Plotly figure with two vertically stacked subplots
+    (calib on top, valid on bottom). Both subplots share their x-axis range
+    independently (no shared_xaxes so zooming one doesn't lock the other).
+    """
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=[f"calib — horizon {horizon}", f"valid — horizon {horizon}"],
+        vertical_spacing=0.22,
     )
 
-    ax.set_title(title)
-    ax.set_xlabel("Time index")
-    ax.grid(alpha=0.3)
+    MEMBER_COLOR = "rgba(180,180,180,0.55)"
+    MEAN_COLOR   = "#e07b25"
+    BAND_COLOR   = "rgba(224,123,37,0.20)"
+    REAL_COLOR   = "#111111"
+
+    for row_idx, ds in enumerate(SETS, start=1):
+        real_path = os.path.join(outputs_dir_for_id(id_name), f"{ds}_real.csv")
+
+        # ---- missing real file → blank panel
+        if not os.path.exists(real_path):
+            fig.add_annotation(
+                text=f"{ds}: missing real file",
+                xref="paper", yref="paper",
+                x=0.5, y=(0.85 if row_idx == 1 else 0.15),
+                showarrow=False, font=dict(size=20, color="red"),
+            )
+            continue
+
+        real = load_real_series(id_name, ds, horizon)
+        ens  = load_pred_ensemble(id_name, ds, horizon)
+        x    = np.arange(len(real))
+
+        # ---- ensemble members (light grey, grouped under one legend entry)
+        if show_members and not ens.empty:
+            first_member = True
+            for c in ens.columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=ens[c].values,
+                        mode="lines",
+                        line=dict(color=MEMBER_COLOR, width=0.8),
+                        name="Members" if first_member else None,
+                        legendgroup="members",
+                        showlegend=(first_member and row_idx == 1),
+                        hoverinfo="skip",
+                    ),
+                    row=row_idx, col=1,
+                )
+                first_member = False
+
+        # ---- ±2 std band + mean
+        if not ens.empty:
+            mean = ens.mean(axis=1).values
+            std2 = 2.0 * ens.std(axis=1).values
+
+            if show_band:
+                # upper boundary — legend entry lives here so give it a
+                # visible line color; that color is what shows in the swatch.
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=mean + std2,
+                        mode="lines",
+                        line=dict(width=1.5, color=MEAN_COLOR),
+                        name="Pred ± 2 std",
+                        legendgroup="band",
+                        showlegend=(row_idx == 1),
+                        hoverinfo="skip",
+                    ),
+                    row=row_idx, col=1,
+                )
+                # lower boundary — this trace owns the fill; it inherits the
+                # legend group but is hidden from the legend.
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=mean - std2,
+                        mode="lines",
+                        line=dict(width=1.5, color=MEAN_COLOR),
+                        fill="tonexty",
+                        fillcolor=BAND_COLOR,
+                        name="Pred ± 2 std",
+                        legendgroup="band",
+                        showlegend=False,
+                        hoverinfo="skip",
+                    ),
+                    row=row_idx, col=1,
+                )
+
+            # mean line
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=mean,
+                    mode="lines",
+                    line=dict(color=MEAN_COLOR, width=2.5),
+                    name="Pred mean",
+                    legendgroup="mean",
+                    showlegend=(row_idx == 1),
+                    hovertemplate="mean: %{y:.3f}<extra></extra>",
+                ),
+                row=row_idx, col=1,
+            )
+
+        # ---- real data
+        fig.add_trace(
+            go.Scatter(
+                x=x,
+                y=real.values,
+                mode="lines",
+                line=dict(color=REAL_COLOR, width=1.2),
+                name="Real",
+                legendgroup="real",
+                showlegend=(row_idx == 1),
+                hovertemplate="real: %{y:.3f}<extra></extra>",
+            ),
+            row=row_idx, col=1,
+        )
+
+        fig.update_yaxes(
+            title_text="Value",
+            title_font=dict(size=25),
+            tickfont=dict(size=20),
+            row=row_idx, col=1,
+        )
+        fig.update_xaxes(
+            title_text="Time index",
+            title_font=dict(size=25),
+            tickfont=dict(size=20),
+            row=row_idx, col=1,
+        )
+
+    # enlarge subplot title annotations (created by make_subplots)
+    for ann in fig.layout.annotations:
+        ann.font = dict(size=20)
+
+    fig.update_layout(
+        title_text=f"Realné vs ensemble predikce — {id_name} — {horizon}",
+        title_font=dict(size=25),
+        height=750,
+        template="plotly_white",
+        font=dict(size=20),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(size=20),
+        ),
+        hovermode="x unified",
+    )
+
+    return fig
 
 
 # =========================================
@@ -238,10 +374,13 @@ with st.sidebar:
 
     id_name = st.selectbox("Nádrž", ids)
 
-    view = st.radio("Zobrazení", ["Time series (real + ensemble preds)", "Metrics (boxplots)"], index=0)
+    view = st.radio(
+        "Zobrazení",
+        ["Time series (real + ensemble preds)", "Metrics (boxplots)"],
+        index=0,
+    )
 
     if view.startswith("Time"):
-        # horizons from calib_real if exists, else valid_real, else none
         hz = find_horizons_from_real(id_name, "calib")
         if not hz:
             hz = find_horizons_from_real(id_name, "valid")
@@ -250,9 +389,8 @@ with st.sidebar:
             st.stop()
 
         horizon = st.selectbox("Horizon", hz)
-
         show_members = st.checkbox("Zobraz každé spuštení (šedá linie)", value=True)
-        show_band = st.checkbox("Ukaž průměr ± 2std", value=True)
+        show_band    = st.checkbox("Ukaž průměr ± 2std", value=True)
 
     else:
         metrics = available_metrics(id_name)
@@ -263,55 +401,30 @@ with st.sidebar:
         metric = st.selectbox("Metrika", metrics)
         same_y = st.checkbox("Použij stejnou y-osu pro calib a valid", value=False)
 
+
 # =========================================
 # Main
 # =========================================
 if view.startswith("Time"):
-    # load calib + valid real + ensemble
     missing = []
     for ds in SETS:
         if not os.path.exists(os.path.join(outputs_dir_for_id(id_name), f"{ds}_real.csv")):
             missing.append(f"{ds}_real.csv")
 
     if missing:
-        st.warning("Missing files: " + ", ".join(missing) + " (that panel will be empty if needed).")
+        st.warning("Missing files: " + ", ".join(missing) + " (that panel will be empty).")
 
-    fig, axes = plt.subplots(2, 1, figsize=(14, 7), sharex=False)
-
-    for ax, ds in zip(axes, SETS):
-        real_path = os.path.join(outputs_dir_for_id(id_name), f"{ds}_real.csv")
-        if not os.path.exists(real_path):
-            ax.set_title(f"{ds} (missing real file)")
-            ax.axis("off")
-            continue
-
-        real = load_real_series(id_name, ds, horizon)
-        ens = load_pred_ensemble(id_name, ds, horizon)
-
-        plot_timeseries_panel(
-            ax=ax,
-            real=real,
-            ens=ens,
-            title=f"{ds} — horizon {horizon}",
-            show_members=show_members,
-            show_band=show_band
-        )
-        ax.set_ylabel("Value")
-        ax.legend(loc="best")
-
-    fig.suptitle(f"Realné vs ensemble predikce — {id_name} — {horizon}", y=0.98)
-    fig.tight_layout()
-    st.pyplot(fig)
+    fig = build_timeseries_figure(id_name, horizon, show_members, show_band)
+    st.plotly_chart(fig, width="stretch")
 
 else:
-    # metrics boxplots
     df_calib = load_metric_long(id_name, "calib", metric)
-    df_valid = load_metric_long(id_name, "valid", metric)
-    df_all = pd.concat([df_calib, df_valid], ignore_index=True)
+    df_valid  = load_metric_long(id_name, "valid", metric)
+    df_all    = pd.concat([df_calib, df_valid], ignore_index=True)
 
     if df_all.empty:
         st.error("No metrics loaded for this selection.")
         st.stop()
 
     fig = metrics_boxplots_two_panels(df_all, metric, same_y=same_y)
-    st.pyplot(fig)
+    st.plotly_chart(fig, width="stretch")
