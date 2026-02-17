@@ -8,7 +8,8 @@ A Streamlit-based interactive dashboard for exploring ANN-based inflow predictio
 
 ## Screenshot
 
-![Streamlit screenshot](screenshot/app_version_20260212.png)
+![Streamlit screenshot](screenshot/app_version_20260217.png)
+![Streamlit screenshot](screenshot/app_version_20260217_metrics.png)
 
 ---
 
@@ -28,12 +29,13 @@ streamlit
 numpy
 pandas
 matplotlib
+plotly
 ```
 
 Install with:
 
 ```bash
-pip install streamlit numpy pandas matplotlib
+pip install streamlit numpy pandas matplotlib plotly
 ```
 
 ---
