@@ -325,13 +325,13 @@ def build_timeseries_figure(
         )
 
         fig.update_yaxes(
-            title_text="Přítok do VN",
+            title_text="Přítok [m3/s]",
             title_font=dict(size=25),
             tickfont=dict(size=20),
             row=row_idx, col=1,
         )
         fig.update_xaxes(
-            title_text="Time index",
+            title_text="Time index [h]",
             title_font=dict(size=25),
             tickfont=dict(size=20),
             row=row_idx, col=1,
