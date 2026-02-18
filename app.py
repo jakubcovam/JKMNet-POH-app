@@ -110,7 +110,7 @@ def metrics_boxplots_two_panels(df_all: pd.DataFrame, metric: str, same_y: bool)
             )
 
     fig.update_layout(
-        title_text=f"{metric} napříč spuštěními — kalibrace vs validace",
+        title_text=f"{metric} napříč spuštěními — {id_name} — kalibrace vs validace",
         title_font=dict(size=25),
         height=500,
         template="plotly_white",
