@@ -8,8 +8,8 @@ A Streamlit-based interactive dashboard for exploring ANN-based inflow predictio
 
 ## Screenshot
 
-![Streamlit screenshot](screenshot/app_version_20260217.png)
-![Streamlit screenshot](screenshot/app_version_20260217_metrics.png)
+![Streamlit screenshot](screenshot/app_version_20260218.png)
+![Streamlit screenshot](screenshot/app_version_20260218_metrics.png)
 
 ---
 
