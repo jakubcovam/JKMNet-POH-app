@@ -246,7 +246,7 @@ def build_timeseries_figure(
                         y=ens[c].values,
                         mode="lines",
                         line=dict(color=MEMBER_COLOR, width=0.8),
-                        name="Members" if first_member else None,
+                        name="Runs" if first_member else None,
                         legendgroup="members",
                         showlegend=(first_member and row_idx == 1),
                         hoverinfo="skip",
@@ -325,7 +325,7 @@ def build_timeseries_figure(
         )
 
         fig.update_yaxes(
-            title_text="Value",
+            title_text="Přítok do VN",
             title_font=dict(size=25),
             tickfont=dict(size=20),
             row=row_idx, col=1,
