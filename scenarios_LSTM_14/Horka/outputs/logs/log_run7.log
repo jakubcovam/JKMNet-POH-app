@@ -1,0 +1,47 @@
+================ Run 7 Settings ================
+Data file: data/inputs/dataOhre_Horka.csv
+ID filter: Horka
+Columns: PREP AET bal_inflow 
+Architecture: 0 
+Trainer: online_bp
+Activation: RELU 
+Weight init: XG
+Input numbers: 0, | 0, | 0, | 
+LSTM timesteps: 14
+LSTM cells: 10
+
+Learning rate: 0.001
+Max iterations: 500
+Max metrics step: 50
+Max error: 0.002
+Batch size: 30
+Ensemble runs: 10
+Train fraction: 0.8
+Shuffle: true
+Split shuffle: false
+Seed: 0
+Transform: MINMAX MINMAX MINMAX 
+Transform alpha: 5
+Exclude last col from transform: false
+Remove NA before calib: true
+PSO optimize: false
+Output dir: data/outputs/
+Log dir: data/outputs/logs/
+Real calib data: data/outputs/calib_real.csv
+Predict calib data: data/outputs/calib_pred.csv
+Real valid data: data/outputs/valid_real.csv
+Predict valid data: data/outputs/valid_pred.csv
+Weights init: data/outputs/weights/weights_init.csv
+Weights final: data/outputs/weights/weights_final.csv
+Metrics calib: data/outputs/metrics/calib_metrics.csv
+Metrics valid: data/outputs/metrics/valid_metrics.csv
+===========================================================
+Run 7 starting...
+-> Training starting...
+-> Training finished.
+-> Evaluating calibration set...
+-> Calibration metrics and predictions saved.
+-> Evaluating validation set...
+-> Validation metrics and predictions saved.
+Run 7 finished.
+-------------------------------------------
